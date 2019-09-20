@@ -12,10 +12,10 @@ library(esquisse)             ## use esquisse to setup the basic plots
 
 library(kableExtra)
 library(magrittr)
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 Table 1:
-```{r}
+```{r,echo=FALSE}
 
 data(mpg)     ## load the data
 
@@ -45,7 +45,7 @@ kable(tbl_1, format = "latex", booktabs=TRUE, digits = 2,     ## call kable to m
 
 Table 2:
 
-```{r}
+```{r,echo=FALSE}
 
 c1 <- c("new beetle","civic","corolla")
 c2 <- c("new beetle","corolla","civic")
@@ -107,7 +107,7 @@ kable(tbl_2, digits = 2, format = "latex", booktabs=TRUE, ,caption = "Top 3 MPG 
                      "Highway 2008"=2))
 ```
 
-```{r}
+```{r,echo=FALSE}
 
 
 
@@ -141,7 +141,7 @@ ggplot(mpg) +
 
 Boxplots
 
-```{r}
+```{r,echo=FALSE}
 
 
 
