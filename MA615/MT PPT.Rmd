@@ -1,0 +1,193 @@
+---
+title: "MT project"
+author: "Shangchen Han"
+date: "10/21/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+library(tidyr)
+library(dplyr)
+library(gapminder)
+library(knitr)
+library(kableExtra)
+library(magrittr)
+library(ggplot2)
+library(lubridate)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+##
+<div class="centered">
+The number and proportion of top 10 taxon in Ningaloo region.
+</div>
+
+```{r,echo=FALSE}
+df <- read.csv(file = "Bar-chart.csv",header = TRUE,sep = ",")
+MyData <- read.csv(file = "data1.csv" ,header = TRUE, sep = ",")
+Data1 <- unique(MyData$Ecoregion)
+num_Taxon <- MyData %>% count(Taxon)
+num_Date <- MyData %>% count(SurveyDate)
+Total_Ningaloo <- MyData %>% filter(Ecoregion == "Ningaloo")
+Total_Broome <- MyData %>% filter(Ecoregion == "Exmouth to Broome")
+Ning_Taxon <- Total_Ningaloo %>% count(Taxon)
+Broo_Taxon <- Total_Broome %>% count(Taxon)
+Ning_Taxon <- Ning_Taxon[with(Ning_Taxon,order(-n)),]
+Ning_Taxon_10 <- Ning_Taxon[1:10,]
+New_Ning_Taxon_10 <- Ning_Taxon_10 %>% mutate(prop = n/sum(n))
+New_Ning_Taxon_10
+```
+##
+<div class="centered">
+The number and proportion of top 10 taxon in Exmouth to Broome region.
+</div>
+
+```{r,echo=FALSE}
+Broo_Taxon <- Broo_Taxon[with(Broo_Taxon,order(-n)),]
+Broo_Taxon_10 <- Broo_Taxon[1:10,]
+New_Broo_Taxon_10 <- Broo_Taxon_10 %>% mutate(prop = n/sum(n))
+New_Broo_Taxon_10
+```  
+##
+#plot
+
+##
+<div class="centered">
+Pie chart of ggplot in Ningaloo.
+</div>
+
+```{r,echo=FALSE}
+ggplot(New_Ning_Taxon_10,aes(x = "", y = prop, fill = Taxon))+
+  geom_bar(width = 1, stat = "identity", color = "white")+
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = prop,label = prop), color = "white")+
+  labs(title = "Percentage")
+```  
+
+##
+<div class="centered">
+Bar chart of top 10 taxon in Ningaloo.
+</div>
+```{r,echo=FALSE}
+ggplot(New_Ning_Taxon_10,aes(x=Taxon,y=n))+
+  geom_bar(stat = "identity")+
+  scale_x_discrete(labels = abbreviate)
+```  
+
+##
+<div class="centered">
+Line chart of top 10 taxon in Ningaloo.
+</div>
+```{r,echo=FALSE}
+ggplot(data = New_Ning_Taxon_10, aes(x=Taxon, y= n, group = 1))+
+  geom_line()+
+  geom_point()+
+  scale_x_discrete(labels = abbreviate)
+```  
+
+##
+<div class="centered">
+Pie chart of top 10 taxon in Ningaloo.
+</div>
+
+```{r,echo=FALSE}
+slices <- New_Ning_Taxon_10$prop
+lbls <- c("Ch-sord","Th-lunare","Sc-bili","Th-lutes","Po-molu","Po-vaiuli","Pl-lac","La-dimi","Ch-ple","Da-aruanus")
+pct <-round(New_Ning_Taxon_10$prop,3)
+lbls <- paste(lbls,pct)
+lbls <- paste(lbls,"%",sep = "")
+pie(slices,labels = lbls, col = rainbow(length(lbls)),main = "Percentage of Taxon")
+```  
+
+
+##
+<div class="centered">
+Pie chart of ggplot in Exmouth to Broome.
+</div>
+```{r,echo=FALSE}
+ggplot(New_Broo_Taxon_10,aes(x = "", y = prop, fill = Taxon))+
+  geom_bar(width = 1, stat = "identity", color = "white")+
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = prop,label = prop), color = "white")+
+  labs(title = "Percentage")
+```  
+
+##
+<div class="centered">
+Bar chart of top 10 taxon in Exmouth to Broome.
+</div>
+```{r,echo=FALSE}
+ggplot(New_Broo_Taxon_10,aes(x=Taxon,y=n))+
+  geom_bar(stat = "identity")+
+  scale_x_discrete(labels = abbreviate)
+```  
+
+##
+<div class="centered">
+Line chart of top 10 taxon in Exmouth to Broome.
+</div>
+```{r,echo=FALSE}
+ggplot(data = New_Broo_Taxon_10, aes(x=Taxon, y= n, group = 1))+
+  geom_line()+
+  geom_point()+
+  scale_x_discrete(labels = abbreviate)
+```  
+
+##
+<div class="centered">
+Pie chart of top 10 taxon in Exmouth to Broome.
+</div>
+```{r,echo=FALSE}
+slices <- New_Broo_Taxon_10$prop
+lbls <- c("Po-milleri","Th-lunare","La-dimid","Ab-benga","Sc-bilineata","Lu-carp","Ac-gram","St-obre","Sc-gho","Ha-melano")
+pct <-round(New_Broo_Taxon_10$prop,3)
+lbls <- paste(lbls,pct)
+lbls <- paste(lbls,"%",sep = "")
+pie(slices,labels = lbls, col = rainbow(length(lbls)),main = "Percentage of Taxon")
+```  
+
+##
+<div class="centered">
+The number of Thalassoma lunare from 2008 to 2019.
+</div>
+```{r,echo=FALSE}
+data_Th_lunare <- MyData %>% filter(Taxon == "Thalassoma lunare")
+num_date_Th_lunare <- data_Th_lunare %>% count(SurveyDate)
+New_num_date_Th_lunare <- num_date_Th_lunare %>% mutate(year(num_date_Th_lunare$SurveyDate))
+names(New_num_date_Th_lunare)[names(New_num_date_Th_lunare) == "year(num_date_Th_lunare$SurveyDate)"] <- "year"
+year_Th <- unique(New_num_date_Th_lunare$year)
+sum_Th <- aggregate(New_num_date_Th_lunare$n, by=list(New_num_date_Th_lunare$year), FUN = sum)
+sum_Th
+```  
+
+##
+<div class="centered">
+Line chart of number of Thalassoma lunare from 2008 to 2019.
+</div>
+```{r,echo=FALSE}
+ggplot(data = sum_Th,aes(x=Group.1,y=x,group=1))+
+  geom_line()+
+  geom_point()
+```  
+
+##
+<div class="centered">
+
+</div>
+```{r,echo=FALSE}
+Data <- read.csv(file = "Data_Th.csv",header = TRUE, sep = ",")
+summary(Data)
+a <- Data$Ecoregion
+b <- Data$Site
+c <- Data$SurveyDate
+d <- Data$Depth
+glm.fit <- glm(Taxon~a+c+d,family = binomial(link = "logit"),data = Data,control = list(maxit=100))
+```  
+
+##
+<div class="centered">
+The result of regression model.
+</div>
+```{r,echo=FALSE}
+glm.fit
+```  

@@ -1,0 +1,139 @@
+---
+title: "MT project"
+author: "Shangchen Han"
+date: "10/19/2019"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(dplyr)
+library(gapminder)
+library(knitr)
+library(kableExtra)
+library(magrittr)
+library(ggplot2)
+library(lubridate)
+```
+
+```{r}
+df <- read.csv(file = "Bar-chart.csv",header = TRUE,sep = ",")
+MyData <- read.csv(file = "data1.csv" ,header = TRUE, sep = ",")
+Data1 <- unique(MyData$Ecoregion)
+num_Taxon <- MyData %>% count(Taxon)
+num_Date <- MyData %>% count(SurveyDate)
+Total_Ningaloo <- MyData %>% filter(Ecoregion == "Ningaloo")
+Total_Broome <- MyData %>% filter(Ecoregion == "Exmouth to Broome")
+Ning_Taxon <- Total_Ningaloo %>% count(Taxon)
+Broo_Taxon <- Total_Broome %>% count(Taxon)
+```
+*Extract data from Global reef fish dataset. After explored data features, I found that the whole data has two ecoregions.So, I wanted to find the differences of taxon between these two ecoregions.Then, I divided the whole data into two parts.* 
+
+```{r}
+Ning_Taxon <- Ning_Taxon[with(Ning_Taxon,order(-n)),]
+Ning_Taxon_10 <- Ning_Taxon[1:10,]
+New_Ning_Taxon_10 <- Ning_Taxon_10 %>% mutate(prop = n/sum(n))
+New_Ning_Taxon_10
+ggplot(New_Ning_Taxon_10,aes(x = "", y = prop, fill = Taxon))+
+  geom_bar(width = 1, stat = "identity", color = "white")+
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = prop,label = prop), color = "white")+
+  labs(title = "Percentage")
+```
+*Pick the top 10 taxon in each regions, because there are lots of taxon in each, and then use graphs to analyze. But, unfortunately, the pie chart of ggplot has problems (the data overlapped).*
+
+```{r}
+ggplot(New_Ning_Taxon_10,aes(x=Taxon,y=n))+
+  geom_bar(stat = "identity")+
+  scale_x_discrete(labels = abbreviate)
+```
+*Using bar-chart to find out the differences of numbers between 10 taxon.*
+
+```{r}
+ggplot(data = New_Ning_Taxon_10, aes(x=Taxon, y= n, group = 1))+
+  geom_line()+
+  geom_point()+
+  scale_x_discrete(labels = abbreviate)
+```
+*Line chart is likely to show the differences clearly.*
+
+```{r}
+slices <- New_Ning_Taxon_10$prop
+lbls <- c("Ch-sord","Th-lunare","Sc-bili","Th-lutes","Po-molu","Po-vaiuli","Pl-lac","La-dimi","Ch-ple","Da-aruanus")
+pct <-round(New_Ning_Taxon_10$prop,3)
+lbls <- paste(lbls,pct)
+lbls <- paste(lbls,"%",sep = "")
+pie(slices,labels = lbls, col = rainbow(length(lbls)),main = "Percentage of Taxon")
+```
+*If the subset coveres only 10 taxon, and find out the proportion of these 10 taxon.*
+
+```{r}
+Broo_Taxon <- Broo_Taxon[with(Broo_Taxon,order(-n)),]
+Broo_Taxon_10 <- Broo_Taxon[1:10,]
+New_Broo_Taxon_10 <- Broo_Taxon_10 %>% mutate(prop = n/sum(n))
+New_Broo_Taxon_10
+ggplot(New_Broo_Taxon_10,aes(x = "", y = prop, fill = Taxon))+
+  geom_bar(width = 1, stat = "identity", color = "white")+
+  coord_polar("y", start = 0)+
+  geom_text(aes(y = prop,label = prop), color = "white")+
+  labs(title = "Percentage")
+```
+*The same as above mentioned, the ggplot of pie-chart has problem of overlapped.*
+
+```{r}
+ggplot(New_Broo_Taxon_10,aes(x=Taxon,y=n))+
+  geom_bar(stat = "identity")+
+  scale_x_discrete(labels = abbreviate)
+```
+*Using bar chart to find out the features of top 10 taxon.*
+```{r}
+ggplot(data = New_Broo_Taxon_10, aes(x=Taxon, y= n, group = 1))+
+  geom_line()+
+  geom_point()+
+  scale_x_discrete(labels = abbreviate)
+```
+
+
+```{r}
+slices <- New_Broo_Taxon_10$prop
+lbls <- c("Po-milleri","Th-lunare","La-dimid","Ab-benga","Sc-bilineata","Lu-carp","Ac-gram","St-obre","Sc-gho","Ha-melano")
+pct <-round(New_Broo_Taxon_10$prop,3)
+lbls <- paste(lbls,pct)
+lbls <- paste(lbls,"%",sep = "")
+pie(slices,labels = lbls, col = rainbow(length(lbls)),main = "Percentage of Taxon")
+
+```
+*Using pie-chart to find out the proportion of these 10 taxon in Exmouth to Broome region.*
+
+```{r}
+data_Th_lunare <- MyData %>% filter(Taxon == "Thalassoma lunare")
+num_date_Th_lunare <- data_Th_lunare %>% count(SurveyDate)
+New_num_date_Th_lunare <- num_date_Th_lunare %>% mutate(year(num_date_Th_lunare$SurveyDate))
+names(New_num_date_Th_lunare)[names(New_num_date_Th_lunare) == "year(num_date_Th_lunare$SurveyDate)"] <- "year"
+year_Th <- unique(New_num_date_Th_lunare$year)
+sum_Th <- aggregate(New_num_date_Th_lunare$n, by=list(New_num_date_Th_lunare$year), FUN = sum)
+sum_Th
+```
+*After compared graphs in Ningaloo and Exmouth to Broome, I found that a taxon named "Thalassoma lunare appeared in both region, so I extracted the data of "Thalassoma lunare", and wanted to find the trend of this species.*
+```{r}
+ggplot(data = sum_Th,aes(x=Group.1,y=x,group=1))+
+  geom_line()+
+  geom_point()
+```
+*The trend of "Thalassoma lunare" in 11 years.*
+```{r}
+Data <- read.csv(file = "Data_Th.csv",header = TRUE, sep = ",")
+summary(Data)
+a <- Data$Ecoregion
+b <- Data$Site
+c <- Data$SurveyDate
+d <- Data$Depth
+glm.fit <- glm(Taxon~a+b+c+d,family = binomial(link = "logit"),data = Data,control = list(maxit=100))
+glm.fit
+glm.fit2 <- glm(Taxon~a+c+d,family = binomial(link = "logit"),data = Data,control = list(maxit=100))
+glm.fit2
+```
+*After clean data, I picked 4 variables to fix the logistic model. But from the output, the coefficients of Ecoregion,Site, SurveyDate and Depth are pretty tiny. So, these variables do not have siginificant influence on Thalassoma lunare.But only for these two models, the second one may be better, because of smaller AIC value.*
+
+
+
