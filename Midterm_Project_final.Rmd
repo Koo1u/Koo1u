@@ -1,0 +1,361 @@
+---
+title: "Minterm Project"
+author: "Shangchen Han"
+date: "12/3/2019"
+output: pdf_document
+---
+## I. Abstract:  
+
+Travel becomes more popular than before, because of releasing pressure during daily life. But traveler is likely to consider the price and quality of the accommodation as their first two concern. The company Airbnb provides information about the accommodations and it is easy for travelers to choose positions by themselves. For this project, its focus on predicting the price of accommodations based on different variables, such as room types, number of reviews, neighborhoods, etc. To be specific, in order to analyze, the whole project has two parts: EDA and modeling. For EDA, it is about finding the relationships between variables, and it also shows the changes in one specific variable based on different years or different conditions. Thus, the trend of changes is visible. For the modeling part, there are some regression models, and by using these models to find the relationships between price and other variables. By compared AIC and deviance of the model, the best model will be chosen. And then travelers could predict the price by themselves.
+
+## II. Introduction:  
+
+# 2.1 Background:  
+
+Airbnb is an online marketplace for arranging or offering lodging, primarily homestays, or tourism experiences. After founded, Airbnb became famous and popular because of the traveling trend. For travelers, they tend to consider price, satisfaction, review as their concerns. Thus, I would like to do analyses such as EDA and modeling to find out the relationships between price and other factors. It will helpful for travelers to predict the price by themselves.
+
+# 2.2 Data Sources:  
+
+The datasets I used for performing the analysis,'Airbnb Data Collection: Get the Data', which is particular in Vancouver, is obtained from the Tomslee website. But, actually, the dataset is not integrated, which means it only includes years from 2015 to 2017. And for the data in 2015 and 2017 have 4 months, so I cannot compare these 3 years directly. 
+
+```{r setup, include=FALSE,echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(magrittr)
+library(ggrepel)
+library(forcats)
+library(scales)
+library(sqldf)
+library(tidyverse)
+library(esquisse)
+library(leaflet)
+library(lme4)
+library(car)
+library(arm)
+library(corrplot)
+library(knitr)
+```
+
+```{r,echo=FALSE,warning=FALSE}
+dt1 <- read.csv(file ="tomslee_airbnb_vancouver_bc_0113_2015-04-25.csv",header = TRUE)
+dt2 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0139_2015-08-22.csv",header = TRUE)
+dt3 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0214_2015-11-26.csv",header = TRUE)
+dt4 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0238_2015-12-15.csv",header = TRUE)
+dt5 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0284_2016-01-17.csv",header = TRUE)
+dt6 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0316_2016-02-19.csv",header = TRUE)
+dt7 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0346_2016-03-20.csv",header = TRUE)
+dt8 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0388_2016-04-17.csv",header = TRUE)
+dt9 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0422_2016-05-20.csv",header = TRUE)
+dt10 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0463_2016-06-19.csv",header = TRUE)
+dt11 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0491_2016-07-18.csv",header = TRUE)
+dt12 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0526_2016-08-20.csv",header = TRUE)
+dt13 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0568_2016-09-17.csv",header = TRUE)
+dt14 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0612_2016-10-20.csv",header = TRUE)
+dt15 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0651_2016-11-22.csv",header = TRUE)
+dt16 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0708_2016-12-23.csv",header = TRUE)
+dt17 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0781_2017-01-14.csv",header = TRUE)
+dt18 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0860_2017-02-16.csv",header = TRUE)
+dt19 <- read.csv(file = "tomslee_airbnb_vancouver_bc_0933_2017-03-13.csv",header = TRUE)
+dt20 <- read.csv(file = "tomslee_airbnb_vancouver_bc_1045_2017-04-08.csv",header = TRUE)
+
+dt <- bind_rows(dt1,dt2,dt3,dt4,dt5,dt6,dt7,dt8,dt9,dt10,dt11,dt12,dt13,dt14,dt15,dt16,dt17,dt18,dt19,dt20)
+dt <- dt[,c(1:3,5:10,12:14)]
+Van_dt <- na.omit(dt)
+```
+
+# 2.3 Previous Work: Data combining and cleaning
+
+The whole data has 20 files, so after imported I need to combine them together and choose available varibles, and then omit NAs.
+
+```{r,echo=FALSE,out.width='100%'}
+##Show the preparations for data cleaning
+include_graphics("prepare1.jpg")
+```
+
+I would not like to choose that price and review equal to zero, because these data are not representative. And then select the year and months, which are overlapped, so that I could compare the factorc in these date, and see whether there are some changes or not. They are April, Augest, November, December, respectively.
+```{r,echo=FALSE,out.width='100%'}
+include_graphics("prepare2.jpg")
+```
+```{r,echo=FALSE,out.width='100%'}
+include_graphics("prepare3.jpg")
+```
+
+```{r,echo=FALSE}
+Van_dt <- Van_dt %>%
+  filter(Van_dt$price>0) %>%
+  filter(Van_dt$reviews>0)
+Van_dt$room_id <- as.character(Van_dt$room_id)
+Van_dt$host_id <- as.character(Van_dt$host_id)
+
+## Try to split last_modified data in Van_dt
+Van_dt <- separate(Van_dt,last_modified,into = c("date","hour"),sep = " ")
+Van_dt <- separate(Van_dt,date,into = c("year","month","day"))
+
+Van_dt1 <- Van_dt
+Van_dt1 <- Van_dt1 %>% filter(year=="2015"| year=="2016")
+Van_dt1 <- Van_dt1 %>% filter(month=="04"| month=="08"| month=="11"| month=="12")
+
+summary(Van_dt[,c(3:9)])
+
+```
+
+*They are some varibles in the data, which might be included in my model. And from this summary, we could see the features of these variables.*
+
+## III. EDA part:
+
+
+```{r,echo=FALSE,warning=FALSE}
+#Distribution of neighborhood
+num_neighborhood <- Van_dt %>% count(neighborhood)
+ggplot(num_neighborhood,aes(x=neighborhood,y=n))+geom_bar(stat = "identity",fill="steelblue")+
+  ggtitle("Fig.1 Distribution of neighborhood")+ylab("Frequency")+xlab("Neighborhood")+theme(axis.text.x = element_text(angle = 45,hjust = 1))
+
+#Distribution of neighborhood in two facets
+ggplot(Van_dt1) +
+ aes(x = neighborhood) +
+ geom_bar(fill = "#0c4c8a") +
+ labs(x = "Neighborhood", y = "Frequency", title = "Fig.2 Distribution of neighborhood in 2015 & 2016 among 4 months") +
+ theme_gray() +
+ facet_wrap(vars(year), scales = "free_x")+theme(axis.text.x = element_text(angle = 45,hjust = 1))
+
+```
+*From Fig.1, as we can see the most of the neighborhoods are in the Downtown region, and then West End and Kitsilano are also popular through the whole dataset. This was the same trend in 2015 and 2016, although there were slight differences between these two years among 4 months. Thus, we can guess that in the future, there will not change too much.*
+
+
+```{r,echo=FALSE,warning=FALSE}
+#Distribution of reviews
+ggplot(Van_dt, aes(reviews))+ geom_histogram(binwidth = 5,color = "black", fill = "steelblue")+ ggtitle("Fig.3 Distribution of reviews") + ylab ("Frequency") + xlab("Review")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))+ xlim(0,150)
+
+#Distribution of reviews in 2 facets
+ggplot(Van_dt1) +
+ aes(x = reviews) +
+ geom_histogram(bins = 30L,color="black", fill = "#0c4c8a") +
+ labs(x = "Reviews", y = "Frequency", title = "Fig.4 Distribution of reviews in 2015 & 2016 among 4 months") +
+ theme_gray() +
+ facet_wrap(vars(year))+theme(axis.text.x = element_text(angle = 0, hjust = 1))+ xlim(0,150)
+```
+*From the plots of the distribution of reviews, as can be seen, most of the Airbnb hosts have no reviews, and this trend does not change, because in 2015 and 2016, they are in the same shape of the distribution.*
+
+\pagebreak
+```{r,echo=FALSE,warning=FALSE}
+#Distribution of overall_satisfaction
+ggplot(Van_dt) +
+ aes(x = overall_satisfaction) +
+ geom_histogram(bins = 30L, fill = "#0c4c8a") +
+ labs(x = "Overall satisfaction", y = "Frequency", title = "Fig.5 Distribution of overall satisfaction") +
+ theme_gray()
+
+#Distribution of overall_satisfaction in 2 facet
+ggplot(Van_dt1) +
+ aes(x = overall_satisfaction) +
+ geom_histogram(bins = 30L, fill = "#0c4c8a") +
+ labs(x = "Overall satisfaction", y = "Frenquncy", title = "Fig.6 Distribution of overall satisfaction in 2015 & 2016 among 4 months") +
+ theme_gray() +
+ facet_wrap(vars(year))
+```
+*Most of the overall satisfaction rating is 4.5 and 5 points. To be specific, in 2015 and 2016 among 4 months, there are not too many changes. In 2016, there are more 0 points of rating Airbnb accommodations than in 2015.*
+
+
+```{r,echo=FALSE}
+#Distribution of Overall_satisfaction in different room_types
+ggplot(data = Van_dt, aes(overall_satisfaction,fill = room_type)) + geom_bar(position  = "fill") + ggtitle("Fig.7 Satisfaction in different room types") + ylab("Percentage") + xlab("overall satifaction") + theme(axis.text.x = element_text(angle = 0, hjust = 1))
+
+#Distribution of Overall_satisfaction in different room_types in 2015 & 2016 among 4 months
+ggplot(data = Van_dt1, aes(overall_satisfaction,fill = room_type)) + geom_bar(position  = "fill") + ggtitle("Fig.8 Satisfaction in different room types") + ylab("Percentage") + xlab("overall satifaction") + theme(axis.text.x = element_text(angle = 0, hjust = 1))+facet_wrap(vars(year))
+```
+*From Fig.7 we could see the satisfaction for different room types. At first sight, the entire home/apt has the largest percentage through most of the range of ratings. But in 1.5 point field, it is only for private room. From Fig.8, in 2015, it has the shape as Fig.7. In contrast, the entire home/apt and private room are complementary, and the rate of entire home/apt increases from 2 points to 5 points.*
+
+\pagebreak
+
+```{r,echo=FALSE,warning=FALSE}
+num_type <- Van_dt %>% group_by(room_type) %>%
+  summarize(Total=n()) %>%
+  mutate(perc=Total/sum(Total)*100)
+ggplot(num_type,aes(x="",y=perc,fill=room_type))+
+  geom_bar(stat = "identity",width = 1)+
+  coord_polar("y",start=0)+geom_text(aes(label=paste0(round(perc),"%")),position=position_stack(vjust = 0.5))+labs(title = "Fig.9 Room type survey ")+theme_void()
+```
+ 
+*Fig.9 shows the percentage of room type, the entire home/apt occupy around 70% of whole dataset, and private room is in the second ranking around 28%. And shared room has the smallest percent(2%).*
+
+
+```{r,echo=FALSE,warning=FALSE}
+num_acc <- Van_dt %>% count(accommodates)
+ggplot(num_acc,aes(x=accommodates,y=n,fill=accommodates))+geom_bar(stat = "identity",fill="steelblue")+
+  ggtitle("Fig.10 Distribution of accommodates")+ylab("Frequency")+xlab("Accommodates")+theme(axis.text.x = element_text(angle = 0,hjust = 1))+theme_gray()
+
+```
+*Fig.10 shows the distribution of accommodates. The most common range of accommodates is from 1 to 6, and the top three accommodates are 2,4,3.*
+
+
+```{r,echo=FALSE}
+
+##create a new dataset called neighborhood.
+neighborhood<-sqldf("select neighborhood, count (room_id), avg(overall_satisfaction),avg(price),avg(reviews), avg(longitude), avg(latitude) from Van_dt group by 1")
+
+##rename the column of the dataset.
+colnames(neighborhood)<-c("Neighborhood","Num_room", "Avg_rating","Avg_price", "reviews","lon", "lat")
+
+```
+
+```{r,echo=FALSE,warning=FALSE}
+library(ggplot2)
+
+ggplot(neighborhood) +
+ aes(x = Neighborhood, weight = Avg_price) +
+ geom_bar(fill = "#0c4c8a") +
+ labs(x = "Neighborhood", y = "Avg. of price", title = "Fig.11 Average price in different neighorhood") +
+ theme_gray()+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+*From Fig.11 we could see that the most expensive Airbnb position is in Kerrisdale around 175 per night, and Downtown, Fairview are also expensive. In contrast, Killarney and Renfrew-Collingwood have the cheapest position for living around 50 dollars.*
+
+
+```{r,echo=FALSE}
+room_type <- sqldf("select room_type, count(room_id), avg(price),avg(reviews) from Van_dt group by 1")
+colnames(room_type) = c("room_type","Num_room","Avg_price","reviews")
+
+ggplot(room_type,aes(x=room_type,y=Avg_price,fill=room_type))+geom_bar(stat = "identity")+ggtitle("Fig.12 Average price among different room types")+xlab("Room type")+ylab("Average price")+theme_gray()
+
+```
+*From Fig.12, the average price for different room types could be seen. The entire home/apt has the highest price of around 125 per night, and the price of the private room is half of the entire home/apt. The price of the shared room is lowest at about 37.5 per night.*
+
+```{r,echo=FALSE,out.width='100%'}
+##Show the price of Airbnb in map
+include_graphics("price2.jpg")
+```
+*This map shows the different prices in different districts. I used median, mean, 3rd quartile to classify the regions. From green, blue, orange to red represents the average price is about 54, 72, 89 and above 89, respectively. Relatively costly positions are in the top left. *
+
+```{r,echo=FALSE,warning=FALSE}
+ggplot(Van_dt,aes(x=price))+geom_histogram(binwidth = 50,,color="black",fill="steelblue")+ggtitle("Fig.13 Distribution of room price") + ylab ("Frequency") + xlab("Price") + theme(axis.text.x = element_text(angle = 0, hjust = 1))+ xlim(0,600)+geom_vline(aes(xintercept=mean(price)),color="red",linetype="dashed",size=1)
+
+#Tranform the price to log(price), since the distribution of price is not normal distribution.
+Van_dt <- Van_dt %>% mutate(log_price = log(price))
+ggplot(Van_dt,aes(x=log_price))+geom_histogram(binwidth = 0.25,color="black",fill="steelblue")+ggtitle("Fig.14 Distribution of log_price") + ylab ("Frequency") + xlab("Log_Price") + theme(axis.text.x = element_text(angle = 0, hjust = 1))+ xlim(1.5,7.5)
+```
+*From Fig.13, the distribution of price does not follow the normal distribution. Thus, it is better to transform the data. After log-transformation, the shape of distribution looks better than before, it roughly follows the normal distribution.*
+
+## IV.Modelling:
+
+## Model choice for linear regression
+
+```{r,echo=FALSE}
+Van_dt_cp <- Van_dt
+Van_dt_cp$room_type <- as.numeric(as.factor(Van_dt_cp$room_type))
+Van_dt_cp$neighborhood <- as.numeric(as.factor(Van_dt_cp$neighborhood))
+Van_dt_cp$year <- as.numeric(as.factor(Van_dt_cp$year))
+Van_dt_cp <- Van_dt_cp[,3:12]
+Van_dt_cp <- Van_dt_cp[,c(1:7,10)]
+M <- cor(Van_dt_cp)
+head(round(M,2))
+corrplot(M,method = "number")
+```
+ 
+*Since accommodate could decide how many people could live in, therefore I want to check whether accommodates and bedrooms have a high correlation. From the output of the correlation plot, we could see the correlation coefficient between these two is 0.73. But actually, it can not determine whether to use accommodates to replace bedrooms or not, vice versa.*
+
+```{r,echo=FALSE}
+m1 <- lm(log_price~room_type+reviews+overall_satisfaction+accommodates+year,data = Van_dt)
+m1.1 <- lm(log_price~room_type+reviews+overall_satisfaction+accommodates+bedrooms+year,data = Van_dt)
+m1.2 <- lm(log_price~room_type+reviews+overall_satisfaction+bedrooms+year,data = Van_dt)
+anova(m1,m1.1,m1.2)
+```
+*They are three linear models. The first one only has accommodates, and the second one has both accommodates and bedrooms, and the third one only has bedrooms as their predictors. From the result, the second model has the least RSS 11070, which means it has the least residuals. Thus, the linear model needs to include both predictors.*
+
+### Linear regression model
+$$log(price) =  \alpha + \beta_1 x_{room type} +\beta_2 x_{reviews} + \beta_3x_{overallsatisfaction} +\beta_4x_{accommodates} + \beta_5 x_{bedrooms}+\beta_6 x_{year} $$
+
+```{r,warning=FALSE,echo=FALSE}
+summary(m1.1)
+plot(m1.1,which = c(1,2))
+```
+*From linear regression output, the adjusted R-squared is about 0.5245, which means this model does not fit very well. And all of the predictors are significant because the p-values are small enough. As can be seen, the first plot is about residual plots, although it is symmetric, it still has some outliers. For the Q-Q plot, most of the points are in the line, but for the tail part, there are some outliers and even out of the line. Thus, from the plots, the model is not compatible with the data.*
+
+### Multilevel linear regression with random intercept
+
+$$log(price) =  \alpha_{i} + \beta_1 x_{roomtype} +\beta_2 x_{reviews}  +\beta_3x_{overallsatisfaction} + \beta_4 x_{accommodates}+\beta_5 x_{bedrooms}+ \beta_6x_{year}$$
+```{r,warning=FALSE,echo=FALSE}
+m2 <- lmer(log_price~room_type+reviews+overall_satisfaction+accommodates+bedrooms+year+(1|neighborhood),data=Van_dt)
+summary(m2)
+confint(m2)
+plot(m2)
+coefplot::coefplot(m2)
+```
+*From the result of the confidence interval, it could be concluded that the whole predictors are significant because the intervals do not include zero point. Besides constant-coefficient, room_type plays the most important role in this model. As can be seen, the residual plot is not very well, because there are some outliers, although most of the points are among the baseline.*
+
+### Multilevel linear regression with random slope
+
+$$log(price) =  \alpha + \beta_1 x_{room_type} +\beta_{2[i]} x_{reviews} + \beta_3 x_{overallsatisfaction}+\beta_4 x_{accommodates}+\beta_5 x_{bedrooms}+\beta_6 x_{year}$$
+```{r,warning=FALSE,echo=FALSE}
+m3 <- lmer(log_price~room_type+reviews+overall_satisfaction+accommodates+bedrooms+year+(0+reviews|neighborhood),data = Van_dt)
+summary(m3)
+confint(m3)
+coefplot::coefplot(m3)
+plot(m3)
+```
+*From the result of the confidence interval, all predictors are significant. Room type has the most significant influence on this model, and then it is bedroom. As can be seen, this model does not fit very well, because, from the residual plot, some regions have outliers.*
+
+### Multilevel linear regression with random intercept and random slope
+
+$$log(price) =  \alpha_{i} + \beta_1 x_{room_type} +\beta_{2[i]} x_{reviews} + \beta_3 x_{overallsatisfaction}+\beta_4 x_{accommodates}+\beta_5 x_{bedrooms}+\beta_6 x_{year}$$
+```{r,warning=FALSE,echo=FALSE}
+m4 <- lmer(log_price~room_type+reviews+overall_satisfaction+accommodates+bedrooms+year+(1+reviews|neighborhood),data = Van_dt)
+summary(m4)
+confint(m4)
+coefplot::coefplot(m4)
+plot(m4)
+
+```
+*Whole predictors are signigicant, and room type is the most influential term. From the residual plot, it seems better than model 3.*
+
+### ANOVA Test:
+
+*In order to check which model is the best, I prefer to use ANOVA to test these three models.*
+```{r,warning=FALSE,echo=FALSE}
+anova(m2,m3,m4,refit=FALSE)
+```
+*Based on the output of the ANOVA test, because the model 4 that has random intercept and the random slope has the least AIC 57431, and it also has the least number of deviance 57405. Thus the fourth model is the best among these 4 models.*
+
+
+## V. Discussion:
+
+### Implication
+*From this analysis of Airbnb in Vancouver, it can be concluded that the room type is the most influential factor in terms of price. And entire home/apt is the most expensive type in room type choices. And also, when travelers are choosing Airbnb, they should concern the number of bedrooms and the neighborhoods. From my survey, the number of bedrooms has a significant influence on the price of Airbnb. In terms of neighborhoods, downtown has the most number of accommodations, but the price is in the top three. Thus, when people plan to travel and want to choose Airbnb, they need to consider the room type, number of bedrooms and the location of accommodations.*
+
+### Limitation
+*My dataset is only from 2015 to 2017, and the data in 2015 and 2017 are not complete. So, I cannot compare these three years directly. Thus, the result may have deviations, and I am not sure whether it is useful for 2019 or not. Besides, my report is only about Vancouver. Thus, it may not be compatible with another region. For the prediction part, the result could not be precise, since predictors are limited.*
+
+### Future direction
+*To improve the precision, I would like to search for another bigger dataset, which includes predictors like the number of facilities in accommodations, and the conditions of transportation near the locations and so on.*
+
+## VI. Reference:
+
+http://tomslee.net
+
+https://en.wikipedia.org/wiki/Airbnb
+
+## VII. Appendix:
+
+### Appendix I
+```{r,echo=FALSE}
+ggplot(room_type) +
+ aes(x = room_type, fill = room_type, weight = reviews) +
+ geom_bar() +
+ scale_fill_hue() +
+ labs(x = "Room type", y = "Frequency", title = "Avg. number of reviews among room types") +
+ theme_minimal()
+```
+*The entire home/apt has the highest number of average reviews. Conversely, the type of shared room has the least information about reviews.*
+
+### Appendix II
+```{r,echo=FALSE}
+ggplot(neighborhood) +
+ aes(x = Neighborhood, weight = Avg_rating) +
+ geom_bar(fill = "#26828e") +
+ labs(x = "Neighborhoods", y = "Satisfaction rate", title = "Avg. satisfaction rate among different regions") +
+ coord_flip() +
+ theme_gray()
+```
+
+*It could be found, Strathcona, Downtown, and Downtown Eastside have the top three high satisfaction rates.*
+
