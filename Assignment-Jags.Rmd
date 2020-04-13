@@ -1,0 +1,134 @@
+---
+title: "HW-JAGS"
+author: "Shangchen Han"
+date: "4/10/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(tidyverse)
+```
+
+## Exercise 8.1
+
+```{r}
+data("Boston")
+y <- Boston[,4]
+s <- c(rep("black",100),rep("blue",200),rep("pink",206))
+data <- data.frame(y=y,s=s)
+colnames(data)[1] <- c("y")
+rownames(data) <- c(1:506)
+source("DBDA2E-utilities.R")
+source("Jags-Ydich-XnomSsubj-MbernBeta.R")
+```
+
+```{r}
+mcmc <- genMCMC(data = data,numSavedSteps = 10000)
+parameterNames <- varnames(mcmc)
+for (parName in parameterNames) {
+  diagMCMC(codaObject = mcmc, parName = parName)
+}
+smryMCMC(mcmc,compVal = NULL,compValDiff = 0.0)
+plotMCMC(mcmc,data = data,compVal = NULL,compValDiff = 0.0)
+```
+
+
+## Exercise 8.2
+
+```{r}
+smryMCMC(mcmc,compVal = 0.5,rope = c(0.45,0.55),compValDiff = 0.0,ropeDiff = c(-0.05,0.05))
+```
+
+## Exercise 8.3
+
+```{r,warning=FALSE}
+fileNameRoot <- "Jags-Ydich-XnomSsubj-MbernBeta-Han"
+graphFileType <- "eps"
+mcmc <- genMCMC(data = data,numSavedSteps = 20000,saveName = fileNameRoot)
+parameterNames <- varnames(mcmc)
+for (parName in parameterNames) {
+  diagMCMC(codaObject = mcmc,parName = parName,saveName = fileNameRoot,saveType = graphFileType)
+}
+detail <- smryMCMC(mcmc,compVal = 0.5,rope = c(0.45,0.55),compValDiff = 0.0,ropeDiff = c(-0.05,0.05),saveName = fileNameRoot)
+plotMCMC(mcmc,data = data,compVal = NULL,compValDiff = 0.0,saveName = fileNameRoot,saveType = graphFileType)
+```
+
+## Exercise 8.4
+
+### (a)
+
+```{r,warning=FALSE}
+source("Jags-Ydich-XnomSsubj-MbernBeta.R")
+
+fileNameRoot = "Jags-Ydich-XnomSsubj-MbernBeta-Han8.4" 
+graphFileType = "eps"
+
+mcmc = genMCMC( data=data , numSavedSteps=20000 , saveName=fileNameRoot )
+
+
+parameterNames = varnames(mcmc)
+for ( parName in parameterNames ) {
+  diagMCMC( codaObject=mcmc , parName=parName , saveName=fileNameRoot , saveType=graphFileType )
+}
+
+
+detail = smryMCMC(mcmc, compVal=0.5, rope=c(0.45,0.55),compValDiff=0.0, ropeDiff = c(-0.05,0.05) ,saveName=fileNameRoot )
+
+
+plotMCMC( mcmc, data=data , compVal=NULL, compValDiff=0.0, saveName=fileNameRoot , saveType=graphFileType)
+```
+
+### (b)
+
+```{r,warning=FALSE}
+source("Jags-Ydich-XnomSsubj-MbernBeta-8.4.b.R")
+
+fileNameRoot = "Jags-Ydich-XnomSsubj-MbernBeta-8.4.b" 
+graphFileType = "eps"
+
+
+mcmc = genMCMC( data=data , numSavedSteps=10000 , saveName=fileNameRoot )
+
+parameterNames = varnames(mcmc)
+for ( parName in parameterNames ) {
+  diagMCMC( codaObject=mcmc , parName=parName , saveName=fileNameRoot , saveType=graphFileType )
+}
+
+detail = smryMCMC(mcmc, compVal=0.5, rope=c(0.45,0.55),compValDiff=0.0, ropeDiff = c(-0.05,0.05) ,saveName=fileNameRoot )
+
+plotMCMC( mcmc, data=data , compVal=NULL, compValDiff=0.0, saveName=fileNameRoot , saveType=graphFileType)
+```
+
+### (c)
+
+```{r,warning=FALSE}
+source("Jags-Ydich-XnomSsubj-MbernBeta-8.4.c.R")
+
+fileNameRoot = "Jags-Ydich-XnomSsubj-MbernBeta-8.4.c" 
+graphFileType = "eps"
+
+
+mcmc = genMCMC( data=data , numSavedSteps=10000 , saveName=fileNameRoot )
+
+parameterNames = varnames(mcmc)
+for ( parName in parameterNames ) {
+  diagMCMC( codaObject=mcmc , parName=parName , saveName=fileNameRoot , saveType=graphFileType )
+}
+
+detail = smryMCMC(mcmc, compVal=0.5, rope=c(0.45,0.55),compValDiff=0.0, ropeDiff = c(-0.05,0.05) ,saveName=fileNameRoot )
+
+plotMCMC( mcmc, data=data , compVal=NULL, compValDiff=0.0, saveName=fileNameRoot , saveType=graphFileType)
+
+```
+
+
+
+
+
+
+
+
+
+
