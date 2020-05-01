@@ -1,0 +1,248 @@
+---
+title: "Time Series Analysis for the Electric and Gas utilities in Industrial Production"
+author: "Shangchen Han"
+date: "4/25/2020"
+output:
+    bookdown::pdf_document2:
+      toc: False
+      latex_engine: xelatex
+    highlight: haddock
+    number_sections: yes
+geometry: margin=0.8in
+fontsize: 11pt
+header-includes:
+      - \usepackage{placeins}
+      - \usepackage{bbm}
+      - \usepackage{booktabs}
+      - \usepackage{float}
+      - \floatplacement{figure}{H}
+abstract: "This time series report focuses on the industrial production especially in electric and gas field. All monthly production data from January 2000 to March 2019 which captured from Kaggle website. Total observations are 233, and it was divided into two parts: train (204) and test (29). There are some steps of my project. Convert data into time series form and also check whether missing valuse. Plot the time series data, and see whether it need to transform. Then use appropriate method ARMA or non-ARMA method to fit the data. After fitting models, compare MAE,RMSE,MAPE to choose the best one model. Finally,use the compatible model to forecast future trend. Thus, the resulting model, SARIMA(2,1,2)(0,1,1)[12] because it has the smallest AICc. Finally, the future pattern could be found from forecasting picture."
+
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,message = F,warning = F,fig.width =6,fig.height = 4 ,out.width='80%',fig.align="center")
+library(forecast)
+library(tseries)
+library(tidyverse)
+library(TSA)
+library(knitr)
+library(bookdown)
+```
+
+
+
+\newpage
+
+# Data and Transformation
+
+From `Figure` \@ref(fig:original-data),it shows that there is obviously seasonal pattern in the time series data, in every year, May has the least amount of production and in terms of Febrary, the production reach at peak. In general, we could see a slightly increasing trend among years. Thus, it means the data is not stationary. In other words, we need to use some appropriate methods to transform it to be stationary.
+
+```{r}
+##Load data file
+data <- read_csv("~/Desktop/BU MSSP/585/Final project/IPG2211A2N.csv")
+data <- data[733:965,]
+#is.na(data) # check the missing values of data
+names(data) <- c("Date","Prod")
+train_1 <- data[1:204,]
+test_1 <- data[205:233,]
+data_1 <- ts(data$Prod,start = c(2000,1),end = c(2019,5),frequency = 12)
+train <- ts(data$Prod[1:204], start = c(2000,1), end = c(2016,12), frequency = 12)
+test <- ts(data$Prod[205:233], start = c(2017,1),frequency=12)
+```
+
+```{r original-data, fig.cap="Time series plot"}
+ggplot(train_1, aes(Date, Prod)) + geom_line() +
+  scale_x_date(date_labels = "%b-%Y", date_breaks = "3 months") + 
+  xlab("") + ylab("Industrial Production:electric and gas") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5),
+        plot.title = element_text(size = 14, hjust = 0.5)) + 
+  ggtitle("Industrial Production data of gas and utilities in US")
+```
+
+In order to see more clear trend and seasonal patterns, it is better to see the decomposition of the time series data. From `Figure` \@ref(fig:decomposition),overall trend is increasing and it has clearly seasonal pattern. Thus, we could use differencing method to remove both trend and seasonal features.
+
+```{r decomposition, fig.cap="Data Decomposition",}
+dec <- decompose(train,type = "additive")
+plot(dec)
+
+```
+
+
+
+According to `Figure` \@ref(fig:transformed),after using differencing method,the new data seems like stationary. In order to be accuracy, the p-value of Dickey-Fuller test is significant smaller than 0.05, which means we could reject the null hypothesis. Thus, the transformed data becomes stationary.
+
+
+```{r transformed,fig.cap="Transformed (differencing) data"}
+diff <- ts(diff(diff(train, lag = 12)), start = c(2000,1), end = c(2016,12), frequency = 12)
+plot(diff)
+abline(0,0)
+
+##Check whether it is stationary
+##adf.test(diff)
+##It means after transformed, the data becomes stationary.
+```
+
+
+# Modelling
+
+
+## ARIMA Models
+
+In terms of `Figure` \@ref(fig:diff),it is helpful for checking both ACF and PACF graphs. AR(2) model is a good choice because PACF plot cuts-off after lag 2 and ACF plot exponential decays to zero. Also MA(2) model could be useful because ACF plot cuts-off after lag 2, and PACF plot exponential decays to zero. In general, ARMA(2,2) is compatible because both ACF and PACF exponential decay to zero.
+
+```{r diff,fig.cap="ACF and PACF Plots for Training Data"}
+par(mfrow=c(1,2))
+acf(diff, lag.max = 48,main = "")
+pacf(diff, lag.max = 48,main = "")
+```
+
+
+From `Figure` \@ref(fig:BIC),the principal is to choose one model which has the smallest and clearest figure. Although the first one has the smallest BIC, the second one is clearer than the first one. Thus,the second one would be the optimal one to fit.  
+
+```{r BIC,fig.cap="BIC plot of subset model selection"}
+#Check Subset ARMA model selection
+fit <- armasubsets(y=diff,nar = 10,nma = 10,y.name = "Subset selection")
+plot(fit)
+```
+
+
+```{r}
+#After see the acf and pacf plots, we could try three models
+#ARIMA(2,1,0)
+fit_arima1 <- Arima(train, order = c(2,1,0))
+#ARIMA(0,1,2)
+fit_arima2 <- Arima(train,order = c(0,1,2))
+#ARIMA(2,1,2)
+fit_arima3 <- Arima(train,order = c(2,1,2))
+#fit_arima3 ## The smallest AICc
+#tsdiag(fit_arima3)
+#Check Subset ARMA model selection
+#fit <- armasubsets(y=diff,nar = 10,nma = 10,y.name = "Subset selection")
+#plot(fit)
+## Then choose the model with the smallest BIC
+fit_arima_sub <- Arima(train,order = c(10,1,2),fixed=c(NA,rep(0,10),NA))
+```  
+
+Since right now we have four ARIMA models, it is better to compare the AICc,and choose the model with the smallest AICc.
+
+**Model**     | **Full Model**                                                       | **AICc**
+--------------| ---------------------------------------------------------------------|-----------
+ARIMA(2,1,0)  | $X_{t}-0.6574X_{t-1}+0.7035X_{t-2}=e_{t}$                            |`r fit_arima1$aicc`
+ARIMA(0,1,2)  | $X_{t}=e_{t}-0.1790e_{t-1}-0.7577e_{t-2}$                            |`r fit_arima2$aicc`
+ARIMA(2,1,2)  | $X_{t}-0.9676X_{t-1}+0.8952X_{t-2}=e_{t}-1.0854e_{t-1}+0.2180e_{t-2}$|`r fit_arima3$aicc`
+ARIMA(10,1,2) | $X_{t}+0.2359X_{t-1}=e_{t}-0.6283e_{t-2}$                            |`r fit_arima_sub$aicc`
+
+Table: Comparison of ARIMA models
+
+### Diagnostics of ARIMA(2,1,2)
+
+
+In terms of diagnostics graph of ARIMA(2,1,2) model`Figure` \@ref(fig:diag1), the residual distribution seems like randomly, and mostly lag of ACF residuals are not significant, which means the model is adequate enough to fit. But for the p-value for Ljung-Box statistic, most of points are below 0.05, which means it is not very good for out model fitting.
+
+```{r diag1,fig.cap="Diagnostics of ARIMA(2,1,2)"}
+tsdiag(fit_arima3)
+```
+
+
+## SARIMA models
+
+For the SARIMA model part, in terms of ARIMA model should be same as before. Since ACF cuts off to zero after the first seasonal lag, while PACF at seasonal lags decay to zero. Thus, MA(1) model should be suitable for seasonal part.
+
+```{r,echo=FALSE}
+fit_sarima1 <- Arima(train, order = c(2,1,0), seasonal = list(order = c(0,1,1), period = 12))
+#fit_sarima1  
+
+fit_sarima2 <- Arima(train, order = c(0,1,2), seasonal = list(order = c(0,1,1), period = 12))
+#fit_sarima2  
+
+fit_sarima3 <- Arima(train, order = c(2,1,2), seasonal = list(order = c(0,1,1), period = 12))
+#fit_sarima3  ## The smallest AICc
+```
+
+Compare three SARIMA models, but ignore the parameters of these models because there are lots of parameters. From the AICc table, it is obviously that SARIMA(2,1,2)x(0,1,1)[12] is the best choise because of the smallest AICc.
+
+**Model**                         |**AICc**
+----------------------------------|----------
+SARIMA$(2,1,0)\times(0,1,1)_{12}$ | 964.1645
+SARIMA$(0,1,2)\times(0,1,1)_{12}$ | 946.6549
+SARIMA$(2,1,2)\times(0,1,1)_{12}$ | 946.17
+
+Table: Comparison of SARIMA Models
+
+### Diagnostics and Q-Q plot of SARIMA(2,1,2)(0,1,1)[12]
+
+According to `Figure` \@ref(fig:diag2) and `Figure` \@ref(fig:qqplot) , the residual distribution seems like randomly distribute, and most of lag in ACF plot are not significant. Meanwhile, the Q-Q plot shows that the residuals does not include much useful information. Thus,this SARIMA(2,1,2)(0,1,1)[12] model is adequate enough for fitting.
+
+```{r diag2,fig.height=4,fig.cap="Diagnostics of SARIMA(2,1,2)(0,1,1)[12]"}
+tsdiag(fit_sarima3)
+```
+
+```{r qqplot,fig.cap="QQ plot of SARIMA(2,1,2)(0,1,1)[12]"}
+qqnorm(residuals(fit_sarima3), main = "Normal Q-Q Plot \nfor SARIMA(2,1,2)(0,1,1)[12]")
+qqline(residuals(fit_sarima3))
+```
+
+# Compare ARIMA and Non-ARIMA Models accuracy
+
+```{r,echo=FALSE}
+##Forecast of ARIMA model
+ARIMAfcast <- forecast(fit_arima3, h = 29)
+ARIMAerr <- test - ARIMAfcast$mean
+ARIMAmae <- mean(abs(ARIMAerr))
+ARIMArmse <- sqrt(mean(ARIMAerr^2))
+ARIMAmape <- mean(abs(ARIMAerr*100)/test)
+```
+
+```{r,echo=FALSE}
+SARIMAfcast <- forecast(fit_sarima3, h = 29)
+SARIMAerr <- test - SARIMAfcast$mean
+SARIMAmae <- mean(abs(SARIMAerr))
+SARIMArmse <- sqrt(mean(SARIMAerr^2))
+SARIMAmape <- mean(abs(SARIMAerr*100)/test)
+```
+
+```{r,echo=FALSE}
+fit_HW <- HoltWinters(train, gamma = TRUE)
+HW <- forecast(fit_HW, h = 29)
+HWerr <- test - HW$mean
+HWmae <- mean(abs(HWerr))
+HWrmse <- sqrt(mean(HWerr^2))
+HWmape <- mean(abs((HWerr*100)/test))
+```
+
+
+**Criteria**|**ARIMA(2,1,2)**| **SARIMA(2,1,2)(0,1,1)[12]**      | **Holt-Winters**
+---------|----------------|------------------|------------------|---------
+  MAE    | `r ARIMAmae`   | `r SARIMAmae`    |   `r HWmae`
+  RMSE   | `r ARIMArmse`  | `r SARIMArmse`   |   `r HWrmse`
+  MAPE   | `r ARIMAmape`  | `r SARIMAmape`   |   `r HWmape`
+  
+
+# Forecasting
+
+Since SARIMA(2,1,2)(0,1,1)[12] has the smallest MAE,RMSE and MAPE, therefore, SARIMA model is the most compatible for our project.
+
+```{r}
+##Forecast & choose final model
+fit <- Arima(data_1, model = fit_sarima3)
+```
+
+From `Figure` \@ref(fig:predict), it shows the prediction pattern of production of electric and gas. The overall pattern is same as before, it has both seasonal and trend fetures.
+
+```{r predict, fig.cap="Forecast future trend of production"}
+plot(forecast(fit), main = "Forecasts trend using SARIMA(2,1,2)(0,1,1)[12]", ylab = "Industrial Production: electric and gas")
+```
+
+According to `Figure` \@ref(fig:compare), by comparing the actual data to the prediction data, it is clear to see SARIMA(2,1,2)(0,1,1)[12] works well, and the predicted values are in the 80% confidence intervals.
+
+```{r compare,fig.cap="Compare actual and prediction"}
+plot(forecast(fit_sarima3, h=29), main = "Forecasts future using SARIMA(2,1,2)(0,1,1)[12] model", ylab = "Industrial Production: electric and gas")
+lines(test, col = 'red', lwd = 2, lty = 2)
+legend("topleft", legend = c("Actual", "Predicted"), lty = c(2,1), lwd = c(2,2), col = c('red','blue'), bty = 'n')
+```
+
+# Reference
+
+https://www.kaggle.com/sadeght/industrial-production-electric-and-gas-utilities
