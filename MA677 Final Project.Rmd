@@ -1,0 +1,262 @@
+---
+title: "MA677 Final Project"
+author: "Shangchen Han"
+date: "5/1/2020"
+output: pdf_document
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE )
+library(dplyr)
+library(deSolve)
+library(readxl)
+library(ggplot2)
+library(lubridate)
+library(forecast)
+library(bookdown)
+library(knitr)
+
+```
+
+## Abstract
+
+The COVID-19 Coronavirus is a new virus for us, and it still spreading very quickly in the world. In each country, more and more people get infected, and from now there is not any signal that it will stop in anytime. Thus, I choose France data from January 22 to April 25 as my whole data set which I found it from Harvard dataverse, and use SIR model and ARIMA model to predict the peak numbers and also future patients number.
+
+## SIR Model
+
+The SIR model can be complexified to incorporate more specificities of the virus outbreak. The basic idea behind the SIR model (Susceptible - Infectious - Recovered) of communicable disease outbreaks is that there are three groups of individuals:  
+
+S: the number of susceptible to the disease. At the start of the pandemic, S is the entire population since no one is immune to the virus.  
+I: the number of infectious people  
+R: The number of recovered or deceased (or immune ) individuals. They are not infectious anymore.  
+
+These groups evolve over time as the virus progresses in the population. Susceptible decreases when individuals are contaminated and move to the infectious group. As people recover or die, they go from the infected group to the recovered group. To model the dynamics of the outbreak I need three differential equations to describe the rates of change in each group, $\beta$, the infection rate, which controls the transition between S and I. $\gamma$, the removal or recovery rate, which controls the transition between I and R. $$\frac{dS}{dt} = -\frac{\beta IS}{N}$$
+$$\frac{dI}{dt} = \frac{\beta IS}{N} - \gamma I$$
+$$\frac{dR}{dt} = \gamma I$$
+
+```{r}
+data <- read_excel("~/Desktop/BU MSSP/677/Final project/France.xlsx")
+data = t(data) %>% data.frame()
+colnames(data) = c("confirmed", "death", "recovered")
+data = data[-1,]
+data$confirmed = as.numeric(levels(data$confirmed))[data$confirmed]
+data$death = as.numeric(levels(data$death))[data$death]
+data$recovered = as.numeric(levels(data$recovered))[data$recovered ]
+data = data %>% mutate(active = confirmed - death - recovered) %>% mutate(date = seq(as.Date('2020-01-22'), as.Date('2020-04-25'), by = 'days'))
+```
+First of all, we need to minimise the sum of the squared differences between $I(t)$, which is the number of people in the infectious compartment I at time t, and the corresponding number of cases as predicted by our model $\hat{I}(t)$. In order to fit a model to the incidence data for France, we need a value N for the initial uninfected population. The population of France was 67,075,000 people, according to Wikipedia.  
+
+```{r}
+N = 67075000
+
+sir_start_date <- "2020-02-01"
+sir_end_date <- "2020-04-25"
+Infected <- subset(data, date >= ymd(sir_start_date) & date <= ymd(sir_end_date))$active
+Day <- 1:(length(Infected))
+
+SIR <- function(time, state, parameters) {
+  par <- as.list(c(state, parameters))
+  with(par, {
+    dS <- -beta * I * S / N
+    dI <- beta * I * S / N - gamma * I
+    dR <- gamma * I
+    list(c(dS, dI, dR))
+  })
+}
+
+init <- c(
+  S = N - Infected[1],
+  I = Infected[1],
+  R = 0
+)
+
+RSS <- function(parameters) {
+  names(parameters) <- c("beta", "gamma")
+  out <- ode(y = init, times = Day, func = SIR, parms = parameters)
+  fit <- out[, 3]
+  sum((Infected - fit)^2)
+}
+
+Opt <- optim(c(0.5, 0.5),
+  RSS,
+  method = "L-BFGS-B",
+  lower = c(0, 0),
+  upper = c(1, 1)
+)
+
+Opt_par <- setNames(Opt$par, c("beta", "gamma"))
+```
+
+```{r}
+t <- 1:as.integer(ymd(sir_end_date) + 1 - ymd(sir_start_date))
+
+# get the fitted values from our SIR model
+fitted_cumulative_incidence <- data.frame(ode(
+  y = init, times = t,
+  func = SIR, parms = Opt_par
+))
+
+# add a Date column and the observed incidence data
+fitted_cumulative_incidence <- fitted_cumulative_incidence %>%
+  mutate(
+    Date = ymd(sir_start_date) + days(t - 1),
+    Country = "France",
+    cumulative_incident_cases = Infected
+  )
+
+# plot the data
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_point(aes(y = cumulative_incident_cases), colour = "blue") +
+  labs(
+    y = "Cumulative incidence",
+    title = "COVID-19 fitted vs observed cumulative active patients in France",
+    subtitle = "(Red = fitted from SIR model, blue = observed)"
+  ) +
+  theme_minimal()
+```
+
+From the above graph, roughly the observed data is following our fitted model. There is a big jump on April 11 from aroung 50 thousand to 75 thousand. But on the end of April the trend of increasing becomes more flat.
+
+
+```{r}
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_point(aes(y = cumulative_incident_cases), colour = "blue") +
+  labs(
+    y = "Cumulative incidence",
+    title = "COVID-19 fitted vs observed cumulative active parients in France",
+    subtitle = "(Red = fitted from SIR model, blue = observed)"
+  ) +
+  theme_minimal() +
+  scale_y_log10(labels = scales::comma)
+```
+
+The above graph showes that, roughly the whole Febrary, the number of confirmed patients is not under the fitted model, and it is still low. Since the end of Febrary, the number start to increase significantly, and from the begining of March it surpasses our model. The data in y-axis is in log scale.
+
+## Calculating R0  
+
+We can use our fitted model to calculate the basic reproduction number $R_0$, also referred as basic reproduction ratio, and which is closely linked to $\beta$ and $\gamma$. The reproduction number gives the average number of susceptible people who are infected by each infectious person. In other words, the reproduction number refers to the number of healthy people that get infected per number of sick people. When $R_0>1$ the disease starts spreading in a population, but not if $R_0<1$. Usually, the larger the value of $R_0$, the harder it is to control the epidemic and the higher the probability of a pandemic.  
+
+$$R_0 = \frac{\beta}{\gamma}$$
+```{r}
+R0 <- as.numeric(Opt_par[1] / Opt_par[2])
+R0
+Opt_par
+```  
+
+A $R_0$ of 1.14 means that, on average in France, 1.14 persons are infected for each infected person. Furthermore, in the literature, it has been estimated that the reproduction number for COVID-19 is approximately 2.7. My reproduction number being lower is mainly due to the number of confirmed cases stayed constant and equal to 1 at the beginning of the pandemic. The reproduction number of 1.14 suggests that 12.3% of the population should be immunized to stop the spread of the infection. With a population in France of approximately 67 million, this translates into roughly 8.24 million people.  
+
+## Analyzing the outbreak
+
+```{r}
+t <- 1:120
+
+# get the fitted values from our SIR model
+fitted_cumulative_incidence <- data.frame(ode(
+  y = init, times = t,
+  func = SIR, parms = Opt_par
+))
+
+# add a Date column and join the observed incidence data
+fitted_cumulative_incidence <- fitted_cumulative_incidence %>%
+  mutate(
+    Date = ymd(sir_start_date) + days(t - 1),
+    Country = "France",
+    cumulative_incident_cases = c(Infected, rep(NA, length(t) - length(Infected)))
+  )
+
+# plot the data
+p=fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I), colour = "red") +
+  geom_line(aes(y = S), colour = "black") +
+  geom_line(aes(y = R), colour = "green") +
+  geom_point(aes(y = cumulative_incident_cases),
+    colour = "blue"
+  ) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(y = "Persons", title = "COVID-19 fitted vs observed cumulative cases in France") +
+  scale_colour_manual(name = "", values = c(
+    red = "red", black = "black",
+    green = "green", blue = "blue"
+  ), labels = c(
+    "Susceptible",
+    "Recovered", "Observed", "Infectious"
+  )) +
+  theme_minimal()
+```
+
+
+```{r}
+# plot the data
+fitted_cumulative_incidence %>%
+  ggplot(aes(x = Date)) +
+  geom_line(aes(y = I, colour = "red")) +
+  geom_line(aes(y = S, colour = "black")) +
+  geom_line(aes(y = R, colour = "green")) +
+  geom_point(aes(y = cumulative_incident_cases, colour = "blue")) +
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    y = "Persons",
+    title = "COVID-19 fitted vs observed cumulative cases in France"
+  ) +
+  scale_colour_manual(
+    name = "",
+    values = c(red = "red", black = "black", green = "green", blue = "blue"),
+    labels = c("Susceptible", "Observed", "Recovered", "Infectious")
+  ) +
+  theme_minimal()
+```
+
+From the graph above, we could see the peak of infectious that will occur in the middle of May. The number of recovered is still waiting for the peak. In terms of number of observed seems like flat since the middle of April.
+
+
+
+```{r}
+fit <- fitted_cumulative_incidence
+fit[fit$I == max(fit$I), c("Date", "I")]
+```
+
+This shows that the peak of incidence will reach peak on May 16th.
+
+```{r}
+#confirmed <- as.data.frame(data$confirmed)
+#confirmed <- confirmed
+#ts_conf <- ts(confirmed)
+#plot.ts(ts_conf,ylab="Number of Confirmed",xlab="Day")
+#title("Number of Confirmed in France per day")
+```
+
+```{r}
+confirmed_new <- as.data.frame(data$confirmed)
+confirmed_new$`data$confirmed` <- log(confirmed_new$`data$confirmed`)
+confirmed_new <- confirmed_new[3:95,]
+con_ts <- ts(confirmed_new)
+plot.ts(con_ts,ylab="Log scale of confirmed numbers",xlab="Day")
+title("Log Number of Confirmed in France per day")
+```
+
+I used log transformation to make the plot more readable. As we could see, the confirmed number from day 35(roughly) start to increase dramatically, and it still does not reach the peak until day 80.
+
+
+```{r}
+con_Fran <- auto.arima(con_ts)
+#predict(Bos_lat_opt,n.ahead = 5,se.fit = T)
+#Bos_lat_forecast <- forecast(object = Bos_lat_opt,h=5)
+#plot(Bos_lat_forecast)
+forecast(con_Fran)
+fit <- Arima(con_ts,model = con_Fran)
+plot(forecast(fit), main = "Forecasts Confirmed number in France by using ARIMA(1,1,1)", ylab = "Log Scale Confirmed Number")
+```
+
+I used ARIMA(1,1,1) model, and as we could see the whold trend still increase in the future, and it is still waiting for the peak of confirmed number. 
+
+## Reference
+
+https://dataverse.harvard.edu/dataverse/2019ncov
+
+https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology
